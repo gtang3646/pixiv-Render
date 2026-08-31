@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixiv API 管理后台</title>
+<style>
+:root{
+  --bg:#f8fafc;--bg-card:#fff;--bg-sidebar:#0f172a;--bg-sidebar-hover:#1e293b;--bg-sidebar-active:#2563eb;
+  --text:#0f172a;--text-muted:#64748b;--text-sidebar:#94a3b8;--text-sidebar-active:#fff;
+  --border:#e2e8f0;--accent:#2563eb;--accent-hover:#1d4ed8;--danger:#ef4444;--danger-hover:#dc2626;
+  --success:#22c55e;--warning:#f59e0b;--radius:8px;--shadow:0 1px 3px rgba(0,0,0,.08);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Noto Sans SC",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.hidden{display:none!important}
+
+.sidebar{width:240px;background:var(--bg-sidebar);color:var(--text-sidebar);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;transition:transform .2s}
+.sidebar-brand{padding:20px 20px 16px;border-bottom:1px solid rgba(255,255,255,.08);font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:10px}
+.sidebar-brand svg{width:24px;height:24px;color:var(--accent)}
+.sidebar-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.sidebar-section{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:rgba(148,163,184,.6);padding:12px 12px 6px;font-weight:600}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:6px;cursor:pointer;font-size:14px;color:var(--text-sidebar);transition:all .15s;margin-bottom:2px;text-decoration:none}
+.nav-item:hover{background:var(--bg-sidebar-hover);color:#fff}
+.nav-item.active{background:var(--bg-sidebar-active);color:var(--text-sidebar-active)}
+.nav-item svg{width:18px;height:18px;flex-shrink:0}
+.sidebar-footer{padding:12px 8px;border-top:1px solid rgba(255,255,255,.08)}
+.sidebar-footer .nav-item{color:#f87171}
+.sidebar-footer .nav-item:hover{background:rgba(239,68,68,.15);color:#f87171}
+
+.main{flex:1;margin-left:240px;min-height:100vh}
+.topbar{background:var(--bg-card);border-bottom:1px solid var(--border);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:16px;font-weight:600}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.content{padding:24px 28px}
+
+.card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
+.card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.card-title{font-size:15px;font-weight:600}
+.card-desc{font-size:13px;color:var(--text-muted);margin-top:2px}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px}
+.stats.row2{grid-template-columns:1fr}
+.stat-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow)}
+.stat-card .stat-label{font-size:12px;color:var(--text-muted);font-weight:500;text-transform:uppercase;letter-spacing:.03em}
+.stat-card .stat-value{font-size:28px;font-weight:700;margin-top:6px;color:var(--text)}
+.stat-card .stat-icon{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;margin-bottom:10px}
+.stat-card .stat-icon svg{width:18px;height:18px}
+.stat-icon.blue{background:#eff6ff;color:#2563eb}
+.stat-icon.red{background:#fef2f2;color:#ef4444}
+.stat-icon.green{background:#f0fdf4;color:#22c55e}
+.stat-icon.amber{background:#fffbeb;color:#f59e0b}
+
+.btn{padding:8px 16px;border:none;border-radius:6px;cursor:pointer;font-size:13px;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--accent);color:#fff}.btn-primary:hover{background:var(--accent-hover)}
+.btn-danger{background:var(--danger);color:#fff}.btn-danger:hover{background:var(--danger-hover)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}.btn-outline:hover{background:#f1f5f9}
+.btn-sm{padding:5px 10px;font-size:12px}
+
+.input{padding:8px 12px;border:1px solid var(--border);border-radius:6px;font-size:14px;width:200px;outline:none;transition:border-color .15s}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(37,99,235,.1)}
+textarea.input{width:100%;min-height:160px;font-family:monospace;font-size:12px;resize:vertical}
+.form-row{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+
+.cfg-item{display:flex;align-items:flex-start;padding:14px 0;border-bottom:1px solid var(--border)}
+.cfg-item:last-child{border-bottom:none}
+.cfg-info{flex:1;min-width:0}
+.cfg-label{font-size:14px;font-weight:500;color:var(--text)}
+.cfg-desc{font-size:12px;color:var(--text-muted);margin-top:2px}
+.cfg-input{flex-shrink:0;margin-left:24px}
+
+.tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.tag{display:inline-flex;align-items:center;gap:6px;background:#f1f5f9;border:1px solid var(--border);padding:5px 10px;border-radius:6px;font-size:13px}
+.tag .del{cursor:pointer;color:var(--text-muted);font-size:15px;line-height:1}.tag .del:hover{color:var(--danger)}
+
+.progress-bar{background:#e2e8f0;border-radius:999px;height:10px;overflow:hidden;margin:12px 0}
+.progress-fill{height:100%;border-radius:999px;transition:width .4s;background:var(--accent)}
+.progress-fill.warn{background:var(--warning)}
+.progress-fill.danger{background:var(--danger)}
+
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}
+.gallery-item{position:relative;border-radius:8px;overflow:hidden;aspect-ratio:1;background:#f1f5f9;border:1px solid var(--border)}
+.gallery-item img{width:100%;height:100%;object-fit:cover;cursor:pointer;transition:transform .2s}
+.gallery-item img:hover{transform:scale(1.04)}
+.gallery-overlay{position:absolute;bottom:0;left:0;right:0;background:linear-gradient(transparent,rgba(0,0,0,.75));color:#fff;padding:8px 10px;font-size:11px}
+.gallery-overlay .go-title{font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.gallery-overlay .go-meta{opacity:.75;margin-top:2px}
+.gallery-del{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;border:none;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s}
+.gallery-item:hover .gallery-del{opacity:1}
+.gallery-del:hover{background:var(--danger)}
+
+.pagination{display:flex;justify-content:center;gap:4px;margin-top:16px}
+.pagination button{padding:6px 12px;border:1px solid var(--border);background:#fff;border-radius:6px;cursor:pointer;font-size:13px;transition:all .15s}
+.pagination button:hover{background:#f1f5f9}
+.pagination button.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pagination button:disabled{opacity:.35;cursor:default;pointer-events:none}
+
+.lightbox{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.88);display:none;align-items:center;justify-content:center;z-index:200}
+.lightbox.show{display:flex}
+.lightbox img{max-width:92vw;max-height:92vh;object-fit:contain;border-radius:6px}
+.lightbox-close{position:absolute;top:16px;right:20px;color:#fff;font-size:30px;cursor:pointer;background:none;border:none;width:36px;height:36px;display:flex;align-items:center;justify-content:center;border-radius:8px;transition:background .15s}
+.lightbox-close:hover{background:rgba(255,255,255,.1)}
+.lightbox-info{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);color:#fff;text-align:center;font-size:13px;background:rgba(0,0,0,.55);backdrop-filter:blur(8px);padding:8px 18px;border-radius:8px}
+
+table{width:100%;border-collapse:collapse}
+th{padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:var(--text-muted);text-transform:uppercase;letter-spacing:.03em;border-bottom:1px solid var(--border);background:#f8fafc}
+td{padding:10px 12px;font-size:13px;border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-flex;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+.badge-green{background:#dcfce7;color:#166534}.badge-red{background:#fee2e2;color:#991b1b}.badge-blue{background:#dbeafe;color:#1e40af}
+
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .mobile-toggle{display:flex!important}
+  .stats{grid-template-columns:1fr}
+  .cfg-item{flex-direction:column}
+  .cfg-input{margin-left:0;margin-top:8px}
+}
+.mobile-toggle{display:none;width:36px;height:36px;border:1px solid var(--border);border-radius:6px;background:#fff;align-items:center;justify-content:center;cursor:pointer}
+
+.chart-container{position:relative;width:100%;height:200px}
+.chart-container canvas{width:100%;height:100%}
+.chart-tabs{display:flex;gap:4px}
+.chart-tab{padding:4px 12px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;font-size:12px;font-weight:500;transition:all .15s}
+.chart-tab:hover{background:#f1f5f9}
+.chart-tab.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+</style>
+</head>
+<body>
+
+<aside class="sidebar" id="sidebar">
+  <div class="sidebar-brand">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg>
+    Pixiv Dashboard
+  </div>
+  <nav class="sidebar-nav">
+    <div class="sidebar-section">概览</div>
+    <a class="nav-item active" onclick="showTab('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      仪表盘
+    </a>
+    <a class="nav-item" onclick="showTab('gallery',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg>
+      图片库
+    </a>
+    <a class="nav-item" onclick="showTab('logs',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      日志
+    </a>
+
+    <div class="sidebar-section" style="margin-top:8px">管理</div>
+    <a class="nav-item" onclick="showTab('blacklist',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="m4.93 4.93 14.14 14.14"/></svg>
+      黑名单
+    </a>
+    <a class="nav-item" onclick="showTab('whitelist',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="m9 12 2 2 4-4"/></svg>
+      白名单
+    </a>
+    <a class="nav-item" onclick="showTab('config',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      配置
+    </a>
+    <a class="nav-item" onclick="showTab('export',this)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      导入导出
+    </a>
+  </nav>
+  <div class="sidebar-footer">
+    <a class="nav-item" onclick="logout()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      退出登录
+    </a>
+  </div>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <button class="mobile-toggle" onclick="document.getElementById('sidebar').classList.toggle('open')">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+    </button>
+    <div class="topbar-title" id="page-title">仪表盘</div>
+    <div class="topbar-right">
+      <span style="font-size:13px;color:var(--text-muted)" id="pool-badge"></span>
+    </div>
+  </div>
+
+  <div class="content">
+    <div id="login-box" style="max-width:380px;margin:80px auto">
+      <div class="card" style="text-align:center;padding:32px">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.5" style="margin-bottom:12px"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <h2 style="font-size:18px;margin-bottom:4px">管理后台</h2>
+        <p style="font-size:13px;color:var(--text-muted);margin-bottom:20px">输入密码登录</p>
+        <input class="input" type="password" id="pw" placeholder="管理密码" style="width:100%;margin-bottom:12px" onkeydown="if(event.key==='Enter')login()">
+        <button class="btn btn-primary" onclick="login()" style="width:100%">登 录</button>
+      </div>
+    </div>
+
+    <div id="app" class="hidden">
+      <div id="tab-dashboard">
+        <div class="stats" id="stats-row1"></div>
+        <div class="stats row2">
+          <div class="stat-card">
+            <div class="card-header" style="margin-bottom:10px">
+              <div><div class="card-title" id="storage-title">存储使用</div></div>
+            </div>
+            <div class="progress-bar"><div class="progress-fill" id="storage-bar" style="width:0%"></div></div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;color:var(--text-muted)">
+              <span id="storage-pct"></span>
+              <span id="storage-count"></span>
+            </div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">调用统计</div>
+            <div class="chart-tabs">
+              <button class="chart-tab active" onclick="loadChart(1,this)">1d</button>
+              <button class="chart-tab" onclick="loadChart(7,this)">7d</button>
+              <button class="chart-tab" onclick="loadChart(30,this)">30d</button>
+            </div>
+          </div>
+          <div class="chart-container"><canvas id="stats-chart"></canvas></div>
+        </div>
+      </div>
+
+      <div id="tab-gallery" class="hidden">
+        <div class="card">
+          <div class="card-header">
+            <div><div class="card-title">图片库 <span id="gallery-count" style="font-weight:normal;color:var(--text-muted);font-size:13px"></span></div></div>
+          </div>
+          <div class="gallery" id="gallery-grid"></div>
+          <div class="pagination" id="gallery-pagination"></div>
+        </div>
+      </div>
+
+      <div id="tab-logs" class="hidden">
+        <div class="card">
+          <div class="card-header"><div class="card-title">API 日志</div></div>
+          <div style="overflow-x:auto">
+            <table><thead><tr><th>时间</th><th>方法</th><th>路径</th><th>状态</th><th>耗时</th></tr></thead><tbody id="log-list"></tbody></table>
+          </div>
+          <div class="pagination" id="log-pagination"></div>
+        </div>
+      </div>
+
+      <div id="tab-blacklist" class="hidden">
+        <div class="card">
+          <div class="card-header"><div class="card-title">黑名单标签</div></div>
+          <div class="form-row"><input class="input" id="bl-tag" placeholder="输入标签名" style="width:240px"><button class="btn btn-primary btn-sm" onclick="addBLTag()">添加</button></div>
+          <div class="tag-list" id="bl-tags"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">黑名单用户</div></div>
+          <div class="form-row">
+            <input class="input" id="bl-uid" placeholder="用户ID" style="width:140px">
+            <input class="input" id="bl-uname" placeholder="用户名(可选)" style="width:180px">
+            <button class="btn btn-primary btn-sm" onclick="addBLUser()">添加</button>
+          </div>
+          <div class="tag-list" id="bl-users"></div>
+        </div>
+      </div>
+
+      <div id="tab-whitelist" class="hidden">
+        <div class="card">
+          <div class="card-header"><div class="card-title">白名单标签</div></div>
+          <div class="form-row"><input class="input" id="wl-tag" placeholder="输入标签名" style="width:240px"><button class="btn btn-primary btn-sm" onclick="addWLTag()">添加</button></div>
+          <div class="tag-list" id="wl-tags"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">白名单用户</div></div>
+          <div class="form-row">
+            <input class="input" id="wl-uid" placeholder="用户ID" style="width:140px">
+            <input class="input" id="wl-uname" placeholder="用户名(可选)" style="width:180px">
+            <button class="btn btn-primary btn-sm" onclick="addWLUser()">添加</button>
+          </div>
+          <div class="tag-list" id="wl-users"></div>
+        </div>
+      </div>
+
+      <div id="tab-config" class="hidden">
+        <div class="card">
+          <div class="card-header"><div class="card-title">配置管理</div></div>
+          <div id="config-form"></div>
+          <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border)">
+            <button class="btn btn-primary btn-sm" onclick="saveConfig()">保存配置</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-export" class="hidden">
+        <div class="card">
+          <div class="card-header"><div class="card-title">导出配置</div></div>
+          <button class="btn btn-outline btn-sm" onclick="doExport()" style="margin-bottom:12px">导出 JSON</button>
+          <textarea class="input" id="export-data" readonly></textarea>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">导入配置</div></div>
+          <textarea class="input" id="import-data" placeholder="粘贴 JSON 配置..."></textarea>
+          <button class="btn btn-danger btn-sm" onclick="doImport()" style="margin-top:10px">导入（将覆盖现有配置）</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="lightbox" class="lightbox" onclick="closeLightbox()">
+  <button class="lightbox-close">&times;</button>
+  <img id="lightbox-img" src="">
+  <div class="lightbox-info" id="lightbox-info"></div>
+</div>
+
+<script>
+const API=location.origin;
+let token='',galleryPage=1,logPage=1;
+
+function headers(){return{'Content-Type':'application/json','Cookie':'admin_session='+token}}
+async function api(method,path,body){
+  const opt={method,headers:headers()};
+  if(body)opt.body=JSON.stringify(body);
+  const r=await fetch(API+path,opt);
+  if(r.status===401){document.getElementById('app').classList.add('hidden');document.getElementById('login-box').classList.remove('hidden');return null}
+  return r.json();
+}
+
+async function login(){
+  const pw=document.getElementById('pw').value;
+  const r=await api('POST','/admin/login',{password:pw});
+  if(r&&r.success){document.getElementById('login-box').classList.add('hidden');document.getElementById('app').classList.remove('hidden');loadDashboard()}
+  else alert(r?.error||'登录失败');
+}
+async function logout(){await api('GET','/admin/logout');document.getElementById('app').classList.add('hidden');document.getElementById('login-box').classList.remove('hidden')}
+
+const tabTitles={dashboard:'仪表盘',gallery:'图片库',logs:'日志',blacklist:'黑名单',whitelist:'白名单',config:'配置',export:'导入导出'};
+function showTab(name,el){
+  document.querySelectorAll('[id^="tab-"]').forEach(e=>e.classList.add('hidden'));
+  document.getElementById('tab-'+name).classList.remove('hidden');
+  document.querySelectorAll('.nav-item').forEach(e=>e.classList.remove('active'));
+  if(el)el.classList.add('active');
+  document.getElementById('page-title').textContent=tabTitles[name]||name;
+  if(name==='dashboard')loadDashboard();
+  if(name==='gallery')loadGallery(1);
+  if(name==='logs')loadLogs(1);
+  if(name==='blacklist')loadBlacklist();
+  if(name==='whitelist')loadWhitelist();
+  if(name==='config')loadConfig();
+}
+
+async function updatePoolBadge(){
+  const r=await api('GET','/admin/stats/overview');
+  if(r&&r.data)document.getElementById('pool-badge').textContent='缓存 '+r.data.cache_count+' | 图片库 '+r.data.gallery_count;
+}
+
+async function loadDashboard(){
+  const r=await api('GET','/admin/stats/overview');
+  if(!r)return;const d=r.data;
+  document.getElementById('stats-row1').innerHTML=
+    '<div class="stat-card"><div class="stat-icon blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="m21 15-5-5L5 21"/></svg></div><div class="stat-label">缓存池</div><div class="stat-value">'+(d.cache_count||0)+' <span style="font-size:14px;font-weight:400;color:var(--text-muted)">/ '+(d.pool_size||0)+'</span></div></div>'+
+    '<div class="stat-card"><div class="stat-icon green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div><div class="stat-label">预下载</div><div class="stat-value">'+(d.predownloaded_count||0)+' <span style="font-size:14px;font-weight:400;color:var(--text-muted)">/ '+(d.predownload_count||0)+'</span></div></div>'+
+    '<div class="stat-card"><div class="stat-icon amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div class="stat-label">图片库</div><div class="stat-value">'+(d.gallery_count||0)+'</div></div>';
+  updatePoolBadge();
+  loadStorage();
+  loadChart(1,document.querySelector('.chart-tab.active'));
+}
+
+async function refreshCache(){
+  document.getElementById('cache-msg').textContent='正在刷新...';
+  document.getElementById('btn-refresh').disabled=true;
+  const r=await api('POST','/admin/cache/refresh',{mode:'daily'});
+  document.getElementById('cache-msg').textContent=r?.success?'刷新成功':'刷新失败';
+  document.getElementById('btn-refresh').disabled=false;
+  loadDashboard();
+}
+
+async function loadStorage(){
+  const r=await api('GET','/admin/storage');if(!r)return;const d=r.data;
+  const pct=Math.min(d.usage_percent,100);
+  const cls=pct>=90?'danger':pct>=70?'warn':'';
+  document.getElementById('storage-bar').style.width=pct+'%';
+  document.getElementById('storage-bar').className='progress-fill '+cls;
+  document.getElementById('storage-title').textContent='存储使用  '+d.used_mb+' MB / '+d.limit_mb+' MB';
+  document.getElementById('storage-pct').textContent=pct.toFixed(1)+'%';
+  document.getElementById('storage-count').textContent=d.file_count+' 个文件';
+}
+
+function fmtSize(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(2)+' MB'}
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}
+
+async function loadGallery(p){
+  galleryPage=p||1;
+  const r=await api('GET','/admin/storage/gallery?page='+galleryPage+'&limit=20');if(!r)return;
+  const files=r.data.files,total=r.data.total,tp=Math.ceil(total/20);
+  document.getElementById('gallery-count').textContent='共 '+total+' 张';
+  if(!files.length){document.getElementById('gallery-grid').innerHTML='<div style="grid-column:1/-1;text-align:center;color:var(--text-muted);padding:48px">暂无图片</div>';document.getElementById('gallery-pagination').innerHTML='';return}
+  let html='';
+  for(const f of files){
+    const fn=f.file_path.split(/[/\\]/).pop(),src='/media/'+fn,t=f.title||'ID: '+f.illust_id,a=f.user_name||'';
+    html+='<div class="gallery-item"><img src="'+src+'" loading="lazy" onclick="openLightbox(\''+src+'\',\''+escHtml(t)+'\',\''+escHtml(a)+'\','+f.file_size+')"><button class="gallery-del" onclick="deleteGalleryFile(event,'+f.illust_id+','+f.page+')" title="删除">&times;</button><div class="gallery-overlay"><div class="go-title">'+escHtml(t)+'</div><div class="go-meta">'+escHtml(a)+' | '+fmtSize(f.file_size)+'</div></div></div>';
+  }
+  document.getElementById('gallery-grid').innerHTML=html;
+  let ph='<button '+(galleryPage<=1?'disabled':'')+' onclick="loadGallery('+(galleryPage-1)+')">&#8249; 上一页</button>';
+  for(let i=1;i<=tp;i++){if(tp>7&&i>2&&i<tp-1&&Math.abs(i-galleryPage)>1){if(!ph.includes('…'))ph+='<button disabled>…</button>';continue}ph+='<button class="'+(i===galleryPage?'active':'')+'" onclick="loadGallery('+i+')">'+i+'</button>'}
+  ph+='<button '+(galleryPage>=tp?'disabled':'')+' onclick="loadGallery('+(galleryPage+1)+')">下一页 &#8250;</button>';
+  document.getElementById('gallery-pagination').innerHTML=ph;
+}
+async function deleteGalleryFile(e,id,pg){e.stopPropagation();if(!confirm('删除这张图片？'))return;const r=await api('DELETE','/admin/storage/file/'+id+'/'+pg);if(r&&r.success)loadGallery(galleryPage)}
+function openLightbox(s,t,a,z){document.getElementById('lightbox-img').src=s;document.getElementById('lightbox-info').innerHTML=t+(a?' | '+a:'')+' | '+fmtSize(z);document.getElementById('lightbox').classList.add('show')}
+function closeLightbox(){document.getElementById('lightbox').classList.remove('show');document.getElementById('lightbox-img').src=''}
+
+const configMeta={
+  admin_enabled:{label:'启用管理后台',desc:'控制是否启用管理后台功能'},
+  feature_stats:{label:'启用统计功能',desc:'是否启用 API 请求次数统计'},
+  feature_logs:{label:'启用日志记录',desc:'是否记录每次 API 请求的日志'},
+  feature_cache:{label:'启用缓存功能',desc:'是否启用 Pixiv 图片缓存池'},
+  feature_blacklist:{label:'启用黑名单',desc:'启用后将过滤黑名单中的标签和用户'},
+  feature_whitelist:{label:'启用白名单',desc:'启用后仅返回白名单中的标签和用户（优先级高于黑名单）'},
+  random_mode:{label:'随机模式',desc:'图片随机选取算法，uniform 为均匀随机'},
+  rate_limit:{label:'请求频率限制',desc:'每个 IP 每分钟允许的最大 API 请求数'},
+  ranking_mode:{label:'排行榜模式',desc:'Pixiv 排行榜类型：daily / weekly / monthly'},
+  cache_ttl_hours:{label:'缓存过期时间',desc:'缓存条目在指定小时数后过期并重新拉取'},
+  cache_pool_size:{label:'缓存池容量',desc:'缓存池最多可保存的图片元数据数量，低于50%时自动从 Pixiv 补充'},
+  cache_predownload_count:{label:'预下载数量',desc:'每次从缓存池预下载到图片库的图片数量，低于50%时自动触发'},
+  storage_limit_mb:{label:'媒体存储上限',desc:'本地图片与视频文件允许占用的总存储空间（MB）'},
+  storage_cleanup_threshold:{label:'清理触发阈值',desc:'存储使用达到上限的该百分比时自动清理旧文件'},
+  storage_check_interval:{label:'存储检查间隔',desc:'自动检查存储使用情况的间隔时间（分钟）'},
+};
+async function loadConfig(){
+  const r=await api('GET','/admin/config');if(!r)return;const cfg=r.data;
+  let html='';for(const[k,v] of Object.entries(cfg)){
+    const m=configMeta[k]||{label:k,desc:''};
+    html+='<div class="cfg-item"><div class="cfg-info"><div class="cfg-label">'+m.label+'</div><div class="cfg-desc">'+m.desc+'</div></div><div class="cfg-input"><input class="input cfg-val" data-key="'+k+'" value="'+v+'" style="width:220px"></div></div>';
+  }
+  document.getElementById('config-form').innerHTML=html;
+}
+async function saveConfig(){const v={};document.querySelectorAll('.cfg-val').forEach(e=>v[e.dataset.key]=e.value);await api('PUT','/admin/config',v);alert('已保存')}
+
+async function loadBlacklist(){
+  const r1=await api('GET','/admin/blacklist/tags');if(r1)document.getElementById('bl-tags').innerHTML=r1.data.map(t=>'<span class="tag">'+escHtml(t)+'<span class="del" onclick="delBLTag(\''+escHtml(t)+'\')">&times;</span></span>').join('');
+  const r2=await api('GET','/admin/blacklist/users');if(r2)document.getElementById('bl-users').innerHTML=r2.data.map(u=>'<span class="tag">'+escHtml(u.user_name||u.user_id)+' ('+u.user_id+')<span class="del" onclick="delBLUser('+u.user_id+')">&times;</span></span>').join('');
+}
+async function addBLTag(){const v=document.getElementById('bl-tag').value.trim();if(!v)return;await api('POST','/admin/blacklist/tags',{tag:v});document.getElementById('bl-tag').value='';loadBlacklist()}
+async function delBLTag(t){await api('DELETE','/admin/blacklist/tags/'+encodeURIComponent(t));loadBlacklist()}
+async function addBLUser(){const uid=document.getElementById('bl-uid').value.trim(),un=document.getElementById('bl-uname').value.trim();if(!uid)return;await api('POST','/admin/blacklist/users',{user_id:parseInt(uid),user_name:un});document.getElementById('bl-uid').value='';document.getElementById('bl-uname').value='';loadBlacklist()}
+async function delBLUser(uid){await api('DELETE','/admin/blacklist/users/'+uid);loadBlacklist()}
+
+async function loadWhitelist(){
+  const r1=await api('GET','/admin/allowed/tags');if(r1)document.getElementById('wl-tags').innerHTML=r1.data.map(t=>'<span class="tag">'+escHtml(t)+'<span class="del" onclick="delWLTag(\''+escHtml(t)+'\')">&times;</span></span>').join('');
+  const r2=await api('GET','/admin/allowed/users');if(r2)document.getElementById('wl-users').innerHTML=r2.data.map(u=>'<span class="tag">'+escHtml(u.user_name||u.user_id)+' ('+u.user_id+')<span class="del" onclick="delWLUser('+u.user_id+')">&times;</span></span>').join('');
+}
+async function addWLTag(){const v=document.getElementById('wl-tag').value.trim();if(!v)return;await api('POST','/admin/allowed/tags',{tag:v});document.getElementById('wl-tag').value='';loadWhitelist()}
+async function delWLTag(t){await api('DELETE','/admin/allowed/tags/'+encodeURIComponent(t));loadWhitelist()}
+async function addWLUser(){const uid=document.getElementById('wl-uid').value.trim(),un=document.getElementById('wl-uname').value.trim();if(!uid)return;await api('POST','/admin/allowed/users',{user_id:parseInt(uid),user_name:un});document.getElementById('wl-uid').value='';document.getElementById('wl-uname').value='';loadWhitelist()}
+async function delWLUser(uid){await api('DELETE','/admin/allowed/users/'+uid);loadWhitelist()}
+
+async function doExport(){const r=await api('POST','/admin/export');if(r&&r.data)document.getElementById('export-data').value=JSON.stringify(r.data,null,2)}
+async function doImport(){const t=document.getElementById('import-data').value;try{const d=JSON.parse(t);const r=await api('POST','/admin/import',d);alert(r?.success?'导入成功':'导入失败')}catch(e){alert('JSON 格式错误: '+e.message)}}
+
+async function loadLogs(p){
+  logPage=p||1;
+  const r=await api('GET','/admin/logs?limit=20&page='+logPage);if(!r)return;
+  const logs=r.data.logs,total=r.data.total,tp=Math.ceil(total/20);
+  document.getElementById('log-list').innerHTML=logs.map(l=>{
+    const sc=l.status_code;
+    const badge=sc>=200&&sc<300?'badge-green':sc>=400?'badge-red':'badge-blue';
+    return '<tr><td>'+l.created_at+'</td><td>'+l.method+'</td><td style="font-family:monospace;font-size:12px">'+l.path+'</td><td><span class="badge '+badge+'">'+sc+'</span></td><td>'+l.response_time_ms+'ms</td></tr>';
+  }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--text-muted);padding:24px">暂无日志</td></tr>';
+  let ph='<button '+(logPage<=1?'disabled':'')+' onclick="loadLogs('+(logPage-1)+')">&#8249; 上一页</button>';
+  for(let i=1;i<=tp;i++){if(tp>7&&i>2&&i<tp-1&&Math.abs(i-logPage)>1){if(!ph.includes('…'))ph+='<button disabled>…</button>';continue}ph+='<button class="'+(i===logPage?'active':'')+'" onclick="loadLogs('+i+')">'+i+'</button>'}
+  ph+='<button '+(logPage>=tp?'disabled':'')+' onclick="loadLogs('+(logPage+1)+')">下一页 &#8250;</button>';
+  document.getElementById('log-pagination').innerHTML=ph;
+}
+
+let chartData=[];
+let chartDays=1;
+
+async function loadChart(days,el){
+  chartDays=days;
+  document.querySelectorAll('.chart-tab').forEach(e=>e.classList.remove('active'));
+  if(el)el.classList.add('active');
+  const r=await api('GET','/admin/stats/chart?days='+days);
+  if(r&&r.data){chartData=r.data;drawChart()}
+}
+
+function drawChart(){
+  const canvas=document.getElementById('stats-chart');
+  if(!canvas)return;
+  const ctx=canvas.getContext('2d');
+  const dpr=window.devicePixelRatio||1;
+  const rect=canvas.parentElement.getBoundingClientRect();
+  canvas.width=rect.width*dpr;
+  canvas.height=rect.height*dpr;
+  ctx.scale(dpr,dpr);
+  const W=rect.width,H=rect.height;
+  const pad={top:20,right:16,bottom:32,left:44};
+  const cW=W-pad.left-pad.right,cH=H-pad.top-pad.bottom;
+
+  ctx.clearRect(0,0,W,H);
+
+  if(!chartData.length){
+    ctx.fillStyle='#94a3b8';ctx.font='13px sans-serif';ctx.textAlign='center';
+    ctx.fillText('暂无数据',W/2,H/2);return;
+  }
+
+  const vals=chartData.map(d=>d.value);
+  const maxV=Math.max(...vals,1);
+  const n=chartData.length;
+
+  ctx.strokeStyle='#e2e8f0';ctx.lineWidth=1;
+  const gridLines=4;
+  for(let i=0;i<=gridLines;i++){
+    const y=pad.top+cH-cH*(i/gridLines);
+    ctx.beginPath();ctx.moveTo(pad.left,y);ctx.lineTo(pad.left+cW,y);ctx.stroke();
+    ctx.fillStyle='#94a3b8';ctx.font='11px sans-serif';ctx.textAlign='right';ctx.textBaseline='middle';
+    ctx.fillText(Math.round(maxV*i/gridLines),pad.left-6,y);
+  }
+
+  ctx.beginPath();
+  for(let i=0;i<n;i++){
+    const x=pad.left+(n===1?cW/2:cW*i/(n-1));
+    const y=pad.top+cH-cH*(vals[i]/maxV);
+    if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+  }
+  ctx.strokeStyle='#2563eb';ctx.lineWidth=2;ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(pad.left,pad.top+cH);
+  for(let i=0;i<n;i++){
+    const x=pad.left+(n===1?cW/2:cW*i/(n-1));
+    const y=pad.top+cH-cH*(vals[i]/maxV);
+    ctx.lineTo(x,y);
+  }
+  ctx.lineTo(pad.left+(n===1?cW/2:cW*(n-1)/(n-1)),pad.top+cH);
+  ctx.closePath();
+  const grad=ctx.createLinearGradient(0,pad.top,0,pad.top+cH);
+  grad.addColorStop(0,'rgba(37,99,235,.15)');grad.addColorStop(1,'rgba(37,99,235,0)');
+  ctx.fillStyle=grad;ctx.fill();
+
+  ctx.fillStyle='#2563eb';
+  for(let i=0;i<n;i++){
+    const x=pad.left+(n===1?cW/2:cW*i/(n-1));
+    const y=pad.top+cH-cH*(vals[i]/maxV);
+    ctx.beginPath();ctx.arc(x,y,3,0,Math.PI*2);ctx.fill();
+  }
+
+  ctx.fillStyle='#64748b';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.textBaseline='top';
+  const step=n<=12?1:Math.ceil(n/12);
+  for(let i=0;i<n;i+=step){
+    const x=pad.left+(n===1?cW/2:cW*i/(n-1));
+    ctx.fillText(chartData[i].label,x,pad.top+cH+8);
+  }
+}
+
+window.addEventListener('resize',function(){if(chartData.length)drawChart()});
+
+document.addEventListener('keydown',function(e){if(e.key==='Escape')closeLightbox()});
+</script>
+</body>
+</html>
