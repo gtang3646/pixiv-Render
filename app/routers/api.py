@@ -172,3 +172,6 @@ async def health():
             "status": "running",
         },
     }
+@router.head("/health")
+async def health_check_head():
+    return Response(status_code=200)
